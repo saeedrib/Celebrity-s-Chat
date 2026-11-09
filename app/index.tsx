@@ -13,7 +13,7 @@ export default function Welcome() {
   if (!isSupabaseConfigured) return Alert.alert('Setup required','Add your Supabase URL and publishable key to the .env file first.');
   if (!email.trim() || password.length < 8 || (mode==='signup' && !name.trim())) return Alert.alert('Check your details','Enter your name, a valid email and a password of at least 8 characters.');
   setBusy(true);
-  const result = mode==='signup' ? await supabase.auth.signUp({email:email.trim(),password,options:{data:{display_name:name.trim()}}}) : await supabase.auth.signInWithPassword({email:email.trim(),password});
+  const result = mode==='signup' ? await supabase.auth.signUp({email:email.trim(),password,options:{data:{display_name:name.trim()},emailRedirectTo:'celebrityschat://auth/callback'}}) : await supabase.auth.signInWithPassword({email:email.trim(),password});
   setBusy(false);
   if (result.error) Alert.alert('Unable to continue',result.error.message); else if(mode==='signup' && !result.data.session) Alert.alert('Check your email','Open the confirmation email to activate your account, then sign in.');
  };
