@@ -5,11 +5,107 @@ import { useAuth } from '../src/providers/AuthProvider';
 import { isSupabaseConfigured, supabase } from '../src/lib/supabase';
 
 export default function Welcome() {
- const { session, loading } = useAuth(); const [mode,setMode] = useState<'login'|'signup'>('signup');
- const [name,setName] = useState(''); const [email,setEmail] = useState(''); const [password,setPassword] = useState(''); const [otp,setOtp] = useState(''); const [otpSent,setOtpSent] = useState(false); const [busy,setBusy] = useState(false);
- if (loading) return <View style={s.center}><ActivityIndicator size="large" color="#0B1F3A" /></View>;
- if (session) return <Redirect href="/(tabs)" />;
- const submit = async () => {\n  if (!isSupabaseConfigured) return Alert.alert('Setup required','Supabase is not configured.');\n  if (otpSent) {\n   if (!/^\\d{6}$/.test(otp.trim())) return Alert.alert('Enter code','Enter the 6-digit code sent to your email.');\n   setBusy(true);\n   const verified = await supabase.auth.verifyOtp({ email: email.trim(), token: otp.trim(), type: 'signup' });\n   setBusy(false);\n   if (verified.error) Alert.alert('Code not accepted', verified.error.message);\n   else Alert.alert('Email verified','Your account is ready.');\n   return;\n  }\n  if (!email.trim() || password.length < 8 || (mode==='signup' && !name.trim())) return Alert.alert('Check your details','Enter your name, a valid email and a password of at least 8 characters.');\n  setBusy(true);\n  const result = mode==='signup' ? await supabase.auth.signUp({email:email.trim(),password,options:{data:{display_name:name.trim()}}}) : await supabase.auth.signInWithPassword({email:email.trim(),password});\n  setBusy(false);\n  if (result.error) Alert.alert('Unable to continue',result.error.message);\n  else if(mode==='signup' && !result.data.session) { setOtpSent(true); Alert.alert('Check your email','Enter the 6-digit verification code sent to your email.'); }\n };
- return <KeyboardAvoidingView style={s.page} behavior={Platform.OS==='ios'?'padding':undefined}><View style={s.brand}><View style={s.logo}><Text style={s.logoText}>C</Text></View><Text style={s.title}>Celebrity's Chat</Text><Text style={s.subtitle}>Connect • Share • Chat • Discover</Text></View><View style={s.card}><Text style={s.heading}>{mode==='signup'?'Join the conversation':'Welcome back'}</Text><Text style={s.helper}>A place to connect with people around the world.</Text>{mode==='signup'&&!otpSent&&<TextInput placeholder="Your full name" value={name} onChangeText={setName} style={s.input} /> }<TextInput placeholder="Email address" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" style={s.input}/>{!otpSent&&<TextInput placeholder="Password (8 characters minimum)" value={password} onChangeText={setPassword} secureTextEntry style={s.input}/>}\n{otpSent&&<TextInput placeholder="6-digit email code" value={otp} onChangeText={setOtp} keyboardType="number-pad" maxLength={6} style={s.input}/>} <Pressable style={s.button} onPress={submit} disabled={busy}>{busy?<ActivityIndicator color="white"/>:<Text style={s.buttonText}>{otpSent?'Verify code':mode==='signup'?'Create account':'Sign in'}</Text>}</Pressable>{otpSent?<Pressable onPress={()=>{setOtpSent(false);setOtp('');}}><Text style={s.switch}>Back to signup</Text></Pressable>:<Pressable onPress={()=>setMode(mode==='signup'?'login':'signup')}><Text style={s.switch}>{mode==='signup'?'Already have an account? Sign in':'New here? Create an account'}</Text></Pressable>}</View><Text style={s.foot}>Be kind. Stay safe. Build real connections.</Text></KeyboardAvoidingView>
+  const { session, loading } = useAuth();
+  const [mode, setMode] = useState<'login' | 'signup'>('signup');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  if (loading) {
+    return <View style={s.center}><ActivityIndicator size="large" color="#0B1F3A" /></View>;
+  }
+  if (session) return <Redirect href="/(tabs)" />;
+
+  const submit = async () => {
+    if (!isSupabaseConfigured) {
+      Alert.alert('Setup required', 'Supabase is not configured.');
+      return;
+    }
+    if (!email.trim() || password.length < 8 || (mode === 'signup' && !name.trim())) {
+      Alert.alert('Check your details', 'Enter your name, a valid email and a password of at least 8 characters.');
+      return;
+    }
+
+    setBusy(true);
+    const result = mode === 'signup'
+      ? await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { data: { display_name: name.trim() } },
+        })
+      : await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    setBusy(false);
+
+    if (result.error) {
+      Alert.alert('Unable to continue', result.error.message);
+      return;
+    }
+
+    if (mode === 'signup' && !result.data.session) {
+      Alert.alert(
+        'Account created, but sign-in is not active',
+        'Please check that Confirm email is OFF in Supabase Authentication settings, then try again.'
+      );
+    } else if (mode === 'signup') {
+      Alert.alert('Welcome!', 'Your account has been created successfully.');
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView style={s.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={s.brand}>
+        <View style={s.logo}><Text style={s.logoText}>C</Text></View>
+        <Text style={s.title}>Celebrity's Chat</Text>
+        <Text style={s.subtitle}>Connect • Share • Chat • Discover</Text>
+      </View>
+      <View style={s.card}>
+        <Text style={s.heading}>{mode === 'signup' ? 'Join the conversation' : 'Welcome back'}</Text>
+        <Text style={s.helper}>A place to connect with people around the world.</Text>
+        {mode === 'signup' && (
+          <TextInput placeholder="Your full name" value={name} onChangeText={setName} style={s.input} autoCapitalize="words" />
+        )}
+        <TextInput
+          placeholder="Email address"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          style={s.input}
+        />
+        <TextInput
+          placeholder="Password (8 characters minimum)"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          style={s.input}
+        />
+        <Pressable style={s.button} onPress={submit} disabled={busy}>
+          {busy ? <ActivityIndicator color="white" /> : <Text style={s.buttonText}>{mode === 'signup' ? 'Create account' : 'Sign in'}</Text>}
+        </Pressable>
+        <Pressable onPress={() => setMode(mode === 'signup' ? 'login' : 'signup')}>
+          <Text style={s.switch}>{mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create an account'}</Text>
+        </Pressable>
+      </View>
+      <Text style={s.foot}>Be kind. Stay safe. Build real connections.</Text>
+    </KeyboardAvoidingView>
+  );
 }
-const s=StyleSheet.create({page:{flex:1,backgroundColor:'#F4F7FB',justifyContent:'center',padding:24},center:{flex:1,alignItems:'center',justifyContent:'center'},brand:{alignItems:'center',marginBottom:28},logo:{width:58,height:58,borderRadius:19,backgroundColor:'#0B1F3A',alignItems:'center',justifyContent:'center'},logoText:{color:'#fff',fontSize:32,fontWeight:'800'},title:{fontSize:27,fontWeight:'800',color:'#0B1F3A',marginTop:12},subtitle:{color:'#64748B',marginTop:6},card:{backgroundColor:'#fff',borderRadius:22,padding:22,shadowColor:'#0B1F3A',shadowOpacity:.08,shadowRadius:20,elevation:4},heading:{fontSize:22,fontWeight:'800',color:'#14243A'},helper:{color:'#64748B',marginTop:6,marginBottom:18},input:{height:52,borderWidth:1,borderColor:'#E2E8F0',borderRadius:12,paddingHorizontal:14,marginBottom:12,color:'#0F172A'},button:{height:52,backgroundColor:'#0B1F3A',borderRadius:13,alignItems:'center',justifyContent:'center',marginTop:4},buttonText:{color:'#fff',fontWeight:'700',fontSize:16},switch:{textAlign:'center',color:'#0D8B68',fontWeight:'700',marginTop:18},foot:{textAlign:'center',color:'#94A3B8',marginTop:22,fontSize:12}});
+
+const s = StyleSheet.create({
+  page: { flex: 1, backgroundColor: '#F4F7FB', justifyContent: 'center', padding: 24 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  brand: { alignItems: 'center', marginBottom: 28 },
+  logo: { width: 58, height: 58, borderRadius: 19, backgroundColor: '#0B1F3A', alignItems: 'center', justifyContent: 'center' },
+  logoText: { color: '#fff', fontSize: 32, fontWeight: '800' },
+  title: { fontSize: 27, fontWeight: '800', color: '#0B1F3A', marginTop: 12 },
+  subtitle: { color: '#64748B', marginTop: 6 },
+  card: { backgroundColor: '#fff', borderRadius: 22, padding: 22, shadowColor: '#0B1F3A', shadowOpacity: 0.08, shadowRadius: 20, elevation: 4 },
+  heading: { fontSize: 22, fontWeight: '800', color: '#14243A' },
+  helper: { color: '#64748B', marginTop: 6, marginBottom: 18 },
+  input: { height: 52, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 14, marginBottom: 12, color: '#0F172A' },
+  button: { height: 52, backgroundColor: '#0B1F3A', borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  switch: { textAlign: 'center', color: '#0D8B68', fontWeight: '700', marginTop: 18 },
+  foot: { textAlign: 'center', color: '#94A3B8', marginTop: 22, fontSize: 12 },
+});
