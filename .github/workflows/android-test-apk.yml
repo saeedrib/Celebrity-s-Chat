@@ -29,6 +29,11 @@ jobs:
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install --non-interactive
 
+      - name: Diagnose Expo native modules
+        run: |
+          npx expo-modules-autolinking search > /tmp/expo-modules.json
+          node -e "const m=require('/tmp/expo-modules.json'); for (const [name,value] of Object.entries(m)) console.log(name, JSON.stringify(value.config));"
+
       - name: Build installable debug APK
         working-directory: android
         run: |
