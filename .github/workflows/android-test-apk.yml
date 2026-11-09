@@ -34,16 +34,16 @@ jobs:
           npx expo-modules-autolinking search --json > /tmp/expo-modules.json
           node -e "const m=require('/tmp/expo-modules.json'); for (const [name,value] of Object.entries(m)) console.log(name, JSON.stringify(value.config));"
 
-      - name: Build installable debug APK
+      - name: Build standalone release APK with embedded JavaScript
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
-      - name: Upload APK
+      - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: celebritys-chat-android-test-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: celebritys-chat-standalone-android-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
