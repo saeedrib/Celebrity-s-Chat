@@ -30,7 +30,7 @@ export default function Welcome() {
   };
 
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color={GREEN} /></View>;
-  if (session) return <Redirect href="/(tabs)" />;
+  if (session) return <Redirect href="/dashboard" />;
 
   const submit = async () => {
     if (!isSupabaseConfigured) return notify('Setup required', 'The account service is not configured yet.');
