@@ -11,6 +11,15 @@ export default function Welcome() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const notify = (title: string, body: string) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.alert(`${title}\n\n${body}`);
+    } else {
+      Alert.alert(title, body);
+    }
+  };
 
   if (loading) {
     return <View style={s.center}><ActivityIndicator size="large" color="#0B1F3A" /></View>;
@@ -19,36 +28,43 @@ export default function Welcome() {
 
   const submit = async () => {
     if (!isSupabaseConfigured) {
-      Alert.alert('Setup required', 'Supabase is not configured.');
+      notify('Setup required', 'Supabase is not configured.');
       return;
     }
     if (!email.trim() || password.length < 8 || (mode === 'signup' && !name.trim())) {
-      Alert.alert('Check your details', 'Enter your name, a valid email and a password of at least 8 characters.');
+      notify('Check your details', 'Enter your name, a valid email and a password of at least 8 characters.');
       return;
     }
 
     setBusy(true);
-    const result = mode === 'signup'
-      ? await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: { data: { display_name: name.trim() } },
-        })
-      : await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    setBusy(false);
+    setMessage('');
+    try {
+      const result = mode === 'signup'
+        ? await supabase.auth.signUp({
+            email: email.trim(),
+            password,
+            options: { data: { display_name: name.trim() } },
+          })
+        : await supabase.auth.signInWithPassword({ email: email.trim(), password });
 
-    if (result.error) {
-      Alert.alert('Unable to continue', result.error.message);
-      return;
-    }
+      if (result.error) {
+        notify('Unable to continue', result.error.message);
+        return;
+      }
 
-    if (mode === 'signup' && !result.data.session) {
-      Alert.alert(
-        'Account created, but sign-in is not active',
-        'Please check that Confirm email is OFF in Supabase Authentication settings, then try again.'
-      );
-    } else if (mode === 'signup') {
-      Alert.alert('Welcome!', 'Your account has been created successfully.');
+      if (mode === 'signup' && !result.data.session) {
+        notify(
+          'Account created — check your email',
+          'Supabase email confirmation is enabled. Open the confirmation email, verify your address, then sign in.'
+        );
+      } else if (mode === 'signup') {
+        notify('Welcome!', 'Your account has been created successfully.');
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Please check your internet connection and try again.';
+      notify('Connection problem', detail);
+    } finally {
+      setBusy(false);
     }
   };
 
