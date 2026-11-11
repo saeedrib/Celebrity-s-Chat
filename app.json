@@ -9,13 +9,17 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.allconnect.celebrityschat"
+      "bundleIdentifier": "com.allconnect.celebritychat"
     },
     "android": {
-      "package": "com.allconnect.celebrityschat",
+      "package": "com.allconnect.celebritychat",
       "adaptiveIcon": {
         "backgroundColor": "#0B1F3A"
       }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
     },
     "plugins": [
       "expo-router",
