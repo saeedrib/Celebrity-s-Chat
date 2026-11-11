@@ -15,6 +15,11 @@ export default function Root({ children }: { children: React.ReactNode }) {
       <body>
         <ScrollViewStyleReset />
         <div id="root">{children}</div>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "(function(){var s=document.createElement('script');s.dataset.zone='12238095';s.src='https://nap5k.com/tag.min.js';(document.body||document.documentElement).appendChild(s);})();",
+          }}
+        />
       </body>
     </html>
   );
