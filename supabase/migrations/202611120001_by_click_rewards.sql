@@ -170,7 +170,9 @@ for select to authenticated using (inviter_id = (select auth.uid()) or invitee_i
 create policy "Members read own BY CLICK withdrawals" on public.by_click_withdrawals
 for select to authenticated using (user_id = (select auth.uid()) or public.by_click_is_admin());
 
-grant select, update on public.by_click_profiles to authenticated;
+grant select on public.by_click_profiles to authenticated;
+revoke update on public.by_click_profiles from authenticated;
+grant update (full_name) on public.by_click_profiles to authenticated;
 grant select on public.by_click_ledger, public.by_click_referrals, public.by_click_withdrawals to authenticated;
 grant execute on function public.by_click_tap() to authenticated;
 grant execute on function public.by_click_request_withdrawal(integer,jsonb) to authenticated;
