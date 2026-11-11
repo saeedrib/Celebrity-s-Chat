@@ -179,3 +179,13 @@ grant execute on function public.by_click_request_withdrawal(integer,jsonb) to a
 grant execute on function public.by_click_review_withdrawal(uuid,boolean,text) to authenticated;
 
 -- No client-side insert/update/delete grants on the points ledger or referral records.
+
+
+-- Lock down SECURITY DEFINER entry points: do not inherit PUBLIC/anon execution.
+revoke all on function public.by_click_create_member() from public, anon, authenticated;
+revoke all on function public.by_click_tap() from public, anon;
+revoke all on function public.by_click_request_withdrawal(integer,jsonb) from public, anon;
+revoke all on function public.by_click_review_withdrawal(uuid,boolean,text) from public, anon;
+grant execute on function public.by_click_tap() to authenticated;
+grant execute on function public.by_click_request_withdrawal(integer,jsonb) to authenticated;
+grant execute on function public.by_click_review_withdrawal(uuid,boolean,text) to authenticated;
