@@ -1,43 +1,48 @@
 import React,{useCallback,useEffect,useState} from 'react';
-import {ActivityIndicator,Alert,FlatList,Pressable,RefreshControl,ScrollView,StyleSheet,Text,View} from 'react-native';
+import {ActivityIndicator,Alert,Pressable,RefreshControl,ScrollView,StyleSheet,Text,View} from 'react-native';
 import {useRouter} from 'expo-router';
 import {Ionicons} from '@expo/vector-icons';
 import {supabase} from '../../src/lib/supabase';
 import {useAuth} from '../../src/providers/AuthProvider';
-type Report={id:string;reporter_id:string;target_user_id:string|null;post_id:string|null;reason:string;status:'open'|'reviewing'|'resolved'|'dismissed';created_at:string};
+const NAVY='#08244A',GREEN='#079447';
+type Withdrawal={id:string;user_id:string;points:number;status:string;created_at:string;payout_details:any;admin_note:string};
+type Member={user_id:string;full_name:string;referral_code:string;created_at:string};
 export default function AdminDashboard(){
- const {session}=useAuth();const router=useRouter();const [stats,setStats]=useState({users:0,posts:0,openReports:0,pendingVerification:0});const [reports,setReports]=useState<Report[]>([]);const [admin,setAdmin]=useState(false);const [busy,setBusy]=useState(true);const [refreshing,setRefreshing]=useState(false);const [acting,setActing]=useState<string|null>(null);
+ const {session,loading}=useAuth();const router=useRouter();const [checking,setChecking]=useState(true),[admin,setAdmin]=useState(false),[members,setMembers]=useState<Member[]>([]),[withdrawals,setWithdrawals]=useState<Withdrawal[]>([]),[refCount,setRefCount]=useState(0),[busy,setBusy]=useState('');
  const load=useCallback(async()=>{
-  if(!session){setBusy(false);return;}
-  const {data:me,error:meError}=await supabase.from('profiles').select('role').eq('id',session.user.id).single();
-  if(meError||me?.role!=='admin'){setAdmin(false);setBusy(false);setRefreshing(false);return;}
-  setAdmin(true);
-  const [u,p,r,v,list]=await Promise.all([
-   supabase.from('profiles').select('id',{count:'exact',head:true}),
-   supabase.from('posts').select('id',{count:'exact',head:true}),
-   supabase.from('reports').select('id',{count:'exact',head:true}).in('status',['open','reviewing']),
-   supabase.from('verification_requests').select('id',{count:'exact',head:true}).eq('status','pending'),
-   supabase.from('reports').select('id,reporter_id,target_user_id,post_id,reason,status,created_at').in('status',['open','reviewing']).order('created_at',{ascending:true}).limit(50)
+  if(!session)return;
+  const {data,error}=await supabase.auth.getUser();
+  const ok=!error&&data.user?.app_metadata?.role==='admin';setAdmin(ok);setChecking(false);
+  if(!ok)return;
+  const [m,w,r]=await Promise.all([
+   supabase.from('by_click_profiles').select('user_id,full_name,referral_code,created_at').order('created_at',{ascending:false}).limit(100),
+   supabase.from('by_click_withdrawals').select('id,user_id,points,status,created_at,payout_details,admin_note').order('created_at',{ascending:false}).limit(100),
+   supabase.from('by_click_referrals').select('id',{count:'exact',head:true})
   ]);
-  if(list.error)Alert.alert('Reports unavailable',list.error.message);
-  setStats({users:u.count||0,posts:p.count||0,openReports:r.count||0,pendingVerification:v.count||0});
-  setReports((list.data||[]) as Report[]);setBusy(false);setRefreshing(false);
+  if(m.error)Alert.alert('Members',m.error.message);else setMembers(m.data||[]);
+  if(w.error)Alert.alert('Withdrawals',w.error.message);else setWithdrawals(w.data||[]);
+  setRefCount(r.count||0);
  },[session]);
- useEffect(()=>{load();},[load]);
- const review=async(row:Report,status:'reviewing'|'resolved'|'dismissed')=>{
-  if(!session)return;setActing(row.id);
-  const {error}=await supabase.from('reports').update({status,reviewed_by:session.user.id}).eq('id',row.id);
-  setActing(null);if(error)Alert.alert('Could not update report',error.message);else{setReports(old=>old.filter(x=>x.id!==row.id));setStats(old=>({...old,openReports:Math.max(0,old.openReports-1)}));}
+ useEffect(()=>{if(!loading&&!session)router.replace('/');else if(session)load();},[loading,session,load]);
+ const review=async(w:Withdrawal,approve:boolean)=>{
+  const label=approve?'approve':'reject';
+  Alert.alert('Confirm action',`Are you sure you want to ${label} this ${w.points.toLocaleString()} point withdrawal?`,[{text:'Cancel',style:'cancel'},{text:'Confirm',onPress:async()=>{
+   setBusy(w.id);const {error}=await supabase.rpc('by_click_review_withdrawal',{p_withdrawal_id:w.id,p_approve:approve,p_note:approve?'Approved by admin':'Rejected by admin'});setBusy('');
+   if(error)Alert.alert('Action failed',error.message);else{Alert.alert('Updated',`Withdrawal ${approve?'approved':'rejected'}.`);await load();}
+  }}]);
  };
- if(busy)return <View style={s.center}><ActivityIndicator color="#0D8B68"/></View>;
- if(!admin)return <View style={s.center}><Ionicons name="lock-closed" size={38} color="#64748B"/><Text style={s.denied}>Admin access only</Text><Text style={s.hint}>This account does not have administrator permissions.</Text><Pressable style={s.back} onPress={()=>router.back()}><Text style={s.backText}>Go back</Text></Pressable></View>;
- return <ScrollView style={s.page} contentContainerStyle={{padding:18,paddingBottom:40}} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load();}}/>}>
-  <View style={s.header}><View><Text style={s.eyebrow}>CELEBRITY'S CHAT</Text><Text style={s.title}>Admin dashboard</Text></View><Pressable onPress={()=>router.back()}><Ionicons name="close-circle-outline" size={27} color="#64748B"/></Pressable></View>
-  <View style={s.grid}><Stat label="Members" value={stats.users} icon="people-outline"/><Stat label="Posts" value={stats.posts} icon="newspaper-outline"/><Stat label="Open reports" value={stats.openReports} icon="flag-outline"/><Stat label="Pending badges" value={stats.pendingVerification} icon="checkmark-circle-outline"/></View>
-  <Pressable style={s.verify} onPress={()=>router.push('/admin/verification')}><Ionicons name="shield-checkmark-outline" size={21} color="#fff"/><Text style={s.verifyText}>Review verified badge applications ({stats.pendingVerification})</Text><Ionicons name="chevron-forward" size={19} color="#fff"/></Pressable>
-  <View style={s.sectionHead}><Text style={s.section}>COMMUNITY REPORTS</Text><Pressable onPress={()=>{setRefreshing(true);load();}}><Ionicons name="refresh" size={20} color="#0D8B68"/></Pressable></View>
-  <FlatList scrollEnabled={false} data={reports} keyExtractor={x=>x.id} ListEmptyComponent={<Text style={s.empty}>No open reports. The community is all clear.</Text>} renderItem={({item})=><View style={s.report}><View style={s.reportTop}><Text style={s.reportType}>{item.target_user_id?'Account report':'Post report'}</Text><Text style={s.reportDate}>{new Date(item.created_at).toLocaleDateString()}</Text></View><Text style={s.reason}>{item.reason}</Text><Text style={s.meta}>Report ID: {item.id.slice(0,8)} · {item.status.toUpperCase()}</Text><View style={s.actions}><Pressable disabled={acting===item.id} onPress={()=>review(item,'reviewing')} style={[s.action,s.review]}><Text style={s.actionText}>Reviewing</Text></Pressable><Pressable disabled={acting===item.id} onPress={()=>review(item,'dismissed')} style={[s.action,s.dismiss]}><Text style={s.actionText}>Dismiss</Text></Pressable><Pressable disabled={acting===item.id} onPress={()=>review(item,'resolved')} style={[s.action,s.resolve]}>{acting===item.id?<ActivityIndicator color="#fff"/>:<Text style={s.actionText}>Resolve</Text>}</Pressable></View></View>}/>
- </ScrollView>;
+ if(loading||checking)return <View style={s.center}><ActivityIndicator color={GREEN}/></View>;
+ if(!admin)return <View style={s.center}><Ionicons name="lock-closed" size={40} color={NAVY}/><Text style={s.title}>Admin access only</Text><Text style={s.note}>A project owner must assign the trusted admin role in Supabase Auth app_metadata.</Text><Pressable style={s.button} onPress={()=>router.replace('/dashboard')}><Text style={s.buttonText}>Back to Member Dashboard</Text></Pressable></View>;
+ const pending=withdrawals.filter(x=>x.status==='pending');
+ return <ScrollView style={s.page} contentContainerStyle={s.content} refreshControl={<RefreshControl refreshing={!!busy} onRefresh={load}/>}>
+  <View style={s.header}><View><Text style={s.kicker}>BY CLICK CONTROL CENTRE</Text><Text style={s.title}>Admin Dashboard</Text></View><Pressable onPress={()=>router.replace('/dashboard')}><Ionicons name="close-circle-outline" size={28} color={NAVY}/></Pressable></View>
+  <View style={s.banner}><Text style={s.bannerTitle}>Secure admin session</Text><Text style={s.bannerText}>Trusted role verified using Supabase app_metadata.</Text></View>
+  <View style={s.stats}><View style={s.stat}><Text style={s.number}>{members.length}</Text><Text style={s.label}>Recent members</Text></View><View style={s.stat}><Text style={s.number}>{refCount}</Text><Text style={s.label}>Referrals recorded</Text></View><View style={s.stat}><Text style={s.number}>{pending.length}</Text><Text style={s.label}>Pending withdrawals</Text></View></View>
+  <Text style={s.section}>Withdrawal Requests</Text>
+  {withdrawals.length?withdrawals.map(w=><View key={w.id} style={s.card}><Text style={s.cardTitle}>{w.points.toLocaleString()} points • {w.status.toUpperCase()}</Text><Text style={s.detail}>Member ID: {w.user_id}</Text><Text style={s.detail}>Account: {w.payout_details?.account_name||'—'} • {w.payout_details?.bank_name||'—'}</Text><Text style={s.detail}>Number: {w.payout_details?.account_number||'—'}</Text><Text style={s.detail}>Requested: {new Date(w.created_at).toLocaleString()}</Text>{w.status==='pending'&&<View style={s.actions}><Pressable disabled={!!busy} style={s.approve} onPress={()=>review(w,true)}><Text style={s.actionText}>{busy===w.id?'Please wait':'Approve'}</Text></Pressable><Pressable disabled={!!busy} style={s.reject} onPress={()=>review(w,false)}><Text style={s.actionText}>Reject</Text></Pressable></View>}</View>):<Text style={s.note}>No withdrawal requests yet.</Text>}
+  <Text style={s.section}>Recent Members</Text>
+  {members.map(m=><View key={m.user_id} style={s.member}><View style={{flex:1}}><Text style={s.cardTitle}>{m.full_name||'BY CLICK Member'}</Text><Text style={s.detail}>Code: {m.referral_code}</Text><Text style={s.detail}>Joined: {new Date(m.created_at).toLocaleDateString()}</Text></View><Text style={s.detail}>{m.user_id.slice(0,8)}…</Text></View>)}
+  <Text style={s.note}>Referral qualification and the 35-referral reward are not automated until the programme defines what counts as a successful referral.</Text>
+ </ScrollView>
 }
-function Stat({label,value,icon}:{label:string;value:number;icon:any}){return <View style={s.stat}><Ionicons name={icon} size={22} color="#0D8B68"/><Text style={s.statValue}>{value}</Text><Text style={s.statLabel}>{label}</Text></View>}
-const s=StyleSheet.create({page:{flex:1,backgroundColor:'#F4F7FB'},center:{flex:1,alignItems:'center',justifyContent:'center',padding:28,backgroundColor:'#F4F7FB'},header:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:20,marginTop:8},eyebrow:{fontSize:10,fontWeight:'800',letterSpacing:1.5,color:'#0D8B68'},title:{fontSize:27,fontWeight:'900',color:'#0B1F3A',marginTop:4},grid:{flexDirection:'row',flexWrap:'wrap',gap:10},stat:{width:'48%',backgroundColor:'#fff',borderRadius:15,padding:15,borderWidth:1,borderColor:'#E8EDF3'},statValue:{fontSize:25,fontWeight:'900',color:'#17263C',marginTop:10},statLabel:{fontSize:12,color:'#64748B',marginTop:2},verify:{marginTop:16,backgroundColor:'#0B1F3A',borderRadius:13,padding:15,flexDirection:'row',alignItems:'center',gap:9},verifyText:{flex:1,color:'#fff',fontWeight:'700',fontSize:12},sectionHead:{marginTop:25,marginBottom:12,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},section:{fontSize:11,fontWeight:'900',letterSpacing:1.2,color:'#64748B'},report:{backgroundColor:'#fff',padding:15,borderRadius:14,marginBottom:10},reportTop:{flexDirection:'row',justifyContent:'space-between'},reportType:{fontWeight:'800',color:'#17263C'},reportDate:{fontSize:11,color:'#94A3B8'},reason:{fontSize:14,color:'#334155',marginTop:10},meta:{fontSize:10,color:'#94A3B8',marginTop:8},actions:{flexDirection:'row',gap:7,marginTop:13},action:{flex:1,borderRadius:8,paddingVertical:9,alignItems:'center'},review:{backgroundColor:'#2563EB'},dismiss:{backgroundColor:'#64748B'},resolve:{backgroundColor:'#0D8B68'},actionText:{fontSize:10,color:'#fff',fontWeight:'800'},empty:{textAlign:'center',color:'#94A3B8',padding:28,backgroundColor:'#fff',borderRadius:12},denied:{fontSize:20,fontWeight:'800',color:'#17263C',marginTop:12},hint:{color:'#64748B',textAlign:'center',marginTop:8},back:{backgroundColor:'#0B1F3A',paddingHorizontal:25,paddingVertical:12,borderRadius:10,marginTop:18},backText:{color:'#fff',fontWeight:'700'}});
+const s=StyleSheet.create({page:{flex:1,backgroundColor:'#F5F8FA'},content:{padding:18,maxWidth:900,width:'100%',alignSelf:'center',paddingBottom:45},center:{flex:1,alignItems:'center',justifyContent:'center',padding:25,backgroundColor:'#F5F8FA'},header:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginVertical:18},kicker:{fontSize:10,fontWeight:'900',letterSpacing:1.5,color:GREEN},title:{fontSize:29,fontWeight:'900',color:NAVY,marginTop:5},banner:{backgroundColor:NAVY,borderRadius:16,padding:18,marginBottom:14},bannerTitle:{fontSize:16,fontWeight:'900',color:'#fff'},bannerText:{fontSize:12,color:'#D4E0EC',marginTop:5},stats:{flexDirection:'row',gap:9},stat:{flex:1,backgroundColor:'#fff',padding:14,borderRadius:14,borderWidth:1,borderColor:'#E7EDF2'},number:{fontSize:25,fontWeight:'900',color:GREEN},label:{fontSize:10,color:'#64748B',marginTop:4},section:{fontSize:20,fontWeight:'900',color:NAVY,marginTop:25,marginBottom:10},card:{backgroundColor:'#fff',borderWidth:1,borderColor:'#E7EDF2',borderRadius:15,padding:15,marginBottom:10},cardTitle:{fontSize:15,fontWeight:'900',color:'#172B45'},detail:{fontSize:11,color:'#64748B',marginTop:5},actions:{flexDirection:'row',gap:10,marginTop:13},approve:{flex:1,backgroundColor:GREEN,padding:12,borderRadius:10,alignItems:'center'},reject:{flex:1,backgroundColor:'#B42318',padding:12,borderRadius:10,alignItems:'center'},actionText:{color:'#fff',fontWeight:'900'},member:{backgroundColor:'#fff',borderRadius:13,padding:14,marginBottom:8,flexDirection:'row',alignItems:'center',borderWidth:1,borderColor:'#E7EDF2'},note:{fontSize:12,color:'#64748B',lineHeight:19,marginTop:10},button:{backgroundColor:NAVY,padding:14,borderRadius:11,marginTop:18},buttonText:{color:'#fff',fontWeight:'800'}});

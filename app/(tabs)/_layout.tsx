@@ -1,3 +1,7 @@
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-export default function TabLayout(){return <Tabs screenOptions={{headerShown:false,tabBarActiveTintColor:'#0D8B68',tabBarInactiveTintColor:'#94A3B8',tabBarStyle:{height:66,paddingTop:8,paddingBottom:8,borderTopColor:'#E8EDF3',backgroundColor:'#fff'},tabBarLabelStyle:{fontSize:11,fontWeight:'600'}}}><Tabs.Screen name="index" options={{title:'Home',tabBarIcon:({color,size})=><Ionicons name="home" color={color} size={size}/>}}/><Tabs.Screen name="discover" options={{title:'Discover',tabBarIcon:({color,size})=><Ionicons name="compass" color={color} size={size}/>}}/><Tabs.Screen name="create" options={{title:'Post',tabBarIcon:({color,size})=><Ionicons name="add-circle" color={color} size={size+7}/>}}/><Tabs.Screen name="messages" options={{title:'Chats',tabBarIcon:({color,size})=><Ionicons name="chatbubbles" color={color} size={size}/>}}/><Tabs.Screen name="profile" options={{title:'Profile',tabBarIcon:({color,size})=><Ionicons name="person-circle" color={color} size={size}/>}}/></Tabs>}
+import { Redirect } from 'expo-router';
+
+// The previous social-chat tab group is intentionally retired on the BY CLICK
+// rebuild branch. Keep legacy source files intact, but do not expose that UI.
+export default function LegacyTabsRedirect() {
+  return <Redirect href="/dashboard" />;
+}

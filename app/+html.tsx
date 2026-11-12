@@ -8,9 +8,10 @@ export default function Root({ children }: { children: React.ReactNode }) {
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="theme-color" content="#08244A" />
         <meta name="monetag" content="9bbd9ea6c793c44a0acaacb7b9151150" />
-        <title>Celebrity&apos;s Chat</title>
-        <meta name="description" content="Connect, share, chat and discover with Celebrity's Chat." />
+        <title>BY CLICK | Tap • Invite • Earn</title>
+        <meta name="description" content="Join BY CLICK, earn points through eligible activities, invite friends and request rewards." />
       </head>
       <body>
         <ScrollViewStyleReset />
